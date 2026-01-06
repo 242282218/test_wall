@@ -1,0 +1,20 @@
+<a class="poster-card tone-{{ poster.tone }}" href="/{{ poster.media_type }}/{{ poster.id }}" style="--stagger: {{ card_index | default(0) }};">
+  <div class="poster-media">
+    {% if poster.poster_url %}
+      <img src="{{ poster.poster_url }}" alt="{{ poster.display_title or poster.title }}">
+    {% else %}
+      <div class="poster-skeleton"></div>
+    {% endif %}
+    <div class="poster-gradient"></div>
+    {% if poster.overview %}
+      <div class="poster-overlay">
+        <p class="poster-overlay-text">{{ poster.overview }}</p>
+      </div>
+    {% endif %}
+  </div>
+  <div class="poster-text">
+    {% set card_text = poster.card_text or poster.title %}
+    <div class="poster-title">{{ card_text }}</div>
+  </div>
+</a>
+

@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page">
+  <section class="detail-hero" style="{% if item.backdrop_url %}background-image: url('{{ item.backdrop_url }}');{% else %}background-color:#0a0e16;{% endif %}">
+    <div class="detail-shell">
+      <div class="detail-poster">
+        {% if item.poster_url %}
+          <img src="{{ item.poster_url }}" alt="{{ item.title }}">
+        {% else %}
+          <div class="poster-skeleton"></div>
+        {% endif %}
+      </div>
+      <div class="detail-meta">
+        <h1 class="detail-title">{{ item.title }}</h1>
+        <div class="detail-subtitle">
+          {% if item.year %}<span>{{ item.year }}</span>{% endif %}
+          {% if item.vote %}<span class="dot">&middot;</span><span>评分 {{ "%.1f"|format(item.vote) }}</span>{% endif %}
+          {% if item.runtime %}<span class="dot">&middot;</span><span>{{ item.runtime }} 分钟</span>{% endif %}
+        </div>
+        {% if item.genres %}
+          <div class="detail-tags">
+            {% for g in item.genres %}
+              <span class="tag">{{ g }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% if item.tagline %}
+          <p class="detail-tagline">“{{ item.tagline }}”</p>
+        {% endif %}
+        {% if item.overview %}
+          <p class="detail-overview">{{ item.overview }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <section class="section detail-section">
+    <div class="section-header">
+      <span class="section-icon">CAST</span>
+      <h2 class="section-title">演员阵容</h2>
+    </div>
+    <div class="section-body">
+      {% if item.cast %}
+        <div class="cast-grid">
+          {% for c in item.cast %}
+            <a class="cast-link" href="/person/{{ c.id }}">
+              <div class="cast-card">
+                <div class="cast-avatar">
+                  {% if c.profile_url %}
+                    <img src="{{ c.profile_url }}" alt="{{ c.name }}">
+                  {% else %}
+                    <div class="poster-skeleton"></div>
+                  {% endif %}
+                </div>
+                <div class="cast-name">{{ c.name }}</div>
+                {% if c.character %}<div class="cast-role">{{ c.character }}</div>{% endif %}
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty">暂无演员信息。</div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="section detail-section">
+    <div class="section-header">
+      <span class="section-icon">PICKS</span>
+      <h2 class="section-title">相关推荐</h2>
+    </div>
+    <div class="section-body">
+      {% if recommendations %}
+        <div class="posters-grid">
+          {% for poster in recommendations %}
+            {% set card_index = loop.index0 %}
+            {% include "partials/poster_card.html" %}
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty">暂无相关推荐。</div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="section detail-section">
+    <div class="section-header">
+      <span class="section-icon">VIDEO</span>
+      <h2 class="section-title">视频预览</h2>
+    </div>
+    <div class="section-body">
+      {% if item.videos %}
+        <div class="video-grid">
+          {% for v in item.videos[:2] %}
+            <div class="video-card">
+              <div class="video-embed">
+                <iframe src="https://www.youtube.com/embed/{{ v.key }}" title="{{ v.name }}" frameborder="0" allowfullscreen></iframe>
+              </div>
+              <div class="video-title">{{ v.name }}</div>
+              {% if v.type %}<div class="video-meta">{{ v.type }}{% if v.official %} · 官方{% endif %}</div>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty">暂无视频资源。</div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="section detail-section" id="quark-resources-section">
+    <div class="section-header">
+      <span class="section-icon">QUARK</span>
+      <h2 class="section-title">夸克网盘资源</h2>
+    </div>
+    <div class="section-body">
+      <div id="quark-resources-container" class="quark-panel">
+        <div class="status status--loading" id="quark-loading">正在加载已保存的资源...</div>
+        <div class="status status--empty is-hidden" id="quark-empty">暂无夸克资源。</div>
+        <div class="status status--error is-hidden" id="quark-error">加载失败，请稍后重试。</div>
+        <div id="quark-resources-list" class="quark-resources is-hidden"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const itemId = {{ item.id }};
+const loading = document.getElementById('quark-loading');
+const empty = document.getElementById('quark-empty');
+const error = document.getElementById('quark-error');
+const list = document.getElementById('quark-resources-list');
+
+const tagClassMap = {
+  '杜比': 'chip--dolby',
+  'HDR10+': 'chip--hdrplus',
+  'HDR': 'chip--hdr',
+  'SDR': 'chip--sdr',
+  '4K': 'chip--4k',
+};
+
+const pct = (value) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return '--';
+  }
+  return `${Math.round(value * 100)}%`;
+};
+
+const renderTag = (tag) => {
+  const cls = tagClassMap[tag] ? `chip chip--quality ${tagClassMap[tag]}` : 'chip chip--quality';
+  return `<span class="${cls}">${tag}</span>`;
+};
+
+async function loadQuarkResources() {
+  loading.classList.remove('is-hidden');
+  empty.classList.add('is-hidden');
+  error.classList.add('is-hidden');
+  list.classList.add('is-hidden');
+  list.innerHTML = '';
+
+  try {
+    const response = await fetch(`/api/quark/media/by-tmdb/${itemId}/resources?sort=score`);
+    const data = await response.json();
+    const resources = Array.isArray(data.data) ? data.data : [];
+
+    if (resources.length === 0) {
+      empty.classList.remove('is-hidden');
+      empty.textContent = data.message || '暂无夸克资源。';
+      return;
+    }
+
+    const summaryTags = [];
+    const seenTags = new Set();
+    resources.forEach((resource) => {
+      const tags = Array.isArray(resource.quality_tags) ? resource.quality_tags : [];
+      tags.forEach((tag) => {
+        if (!seenTags.has(tag)) {
+          seenTags.add(tag);
+          summaryTags.push(tag);
+        }
+      });
+    });
+
+    let html = '';
+    if (summaryTags.length > 0) {
+      html += `
+        <div class="quark-summary">
+          <span class="quark-summary-label">优质标签</span>
+          <div class="quark-summary-tags">${summaryTags.map(renderTag).join('')}</div>
+        </div>
+      `;
+    }
+
+    html += '<div class="quark-resources-grid">';
+    resources.forEach((resource, index) => {
+      const isBest = resource.is_best ? '<span class="chip chip--best">最佳</span>' : '';
+      const tags = Array.isArray(resource.quality_tags) && resource.quality_tags.length
+        ? resource.quality_tags
+        : (resource.resolution || resource.quality_level ? [resource.resolution || resource.quality_level] : []);
+      const qualityBadges = tags.length ? `<div class="quark-tags">${tags.map(renderTag).join('')}</div>` : '';
+      const sizeText = resource.size_raw || (resource.total_size_gb ? `${resource.total_size_gb.toFixed(1)} GB` : '');
+      const codecText = resource.codec || '';
+
+      html += `
+        <article class="quark-card">
+          <div class="quark-card-head">
+            <div class="quark-card-title">${index + 1}. ${resource.name}</div>
+            ${isBest}
+          </div>
+          ${qualityBadges}
+          <div class="quark-card-meta">
+            ${sizeText ? `<span>${sizeText}</span>` : ''}
+            ${codecText ? `<span>${codecText}</span>` : ''}
+            ${resource.resolution ? `<span>${resource.resolution}</span>` : ''}
+          </div>
+          <div class="quark-card-scores">
+            <span>置信度 ${pct(resource.confidence)}</span>
+            <span>画质 ${pct(resource.quality_score)}</span>
+            <span>综合 ${pct(resource.overall_score)}</span>
+          </div>
+          <a class="btn-primary btn-primary--ghost" href="${resource.link}" target="_blank" rel="noopener">打开链接</a>
+        </article>
+      `;
+    });
+    html += '</div>';
+
+    list.innerHTML = html;
+    list.classList.remove('is-hidden');
+  } catch (error) {
+    console.error('加载失败:', error);
+    error.classList.remove('is-hidden');
+  } finally {
+    loading.classList.add('is-hidden');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadQuarkResources);
+</script>
+{% endblock %}

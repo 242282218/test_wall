@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page">
+  {% set section_titles = {
+    "trending": "本周趋势",
+    "popular": "热门电影",
+    "top_rated": "高分佳作",
+    "now_playing": "正在上映"
+  } %}
+  {% set section_icons = {
+    "trending": "TREND",
+    "popular": "HOT",
+    "top_rated": "BEST",
+    "now_playing": "NOW"
+  } %}
+
+  {% for key, posters in sections.items() %}
+    <section class="section">
+      <div class="section-header">
+        <span class="section-icon">{{ section_icons.get(key, "CAT") }}</span>
+        <h2 class="section-title">{{ section_titles.get(key, key) }}</h2>
+      </div>
+      <div class="posters-grid">
+        {% if posters %}
+          {% for poster in posters %}
+            {% set card_index = loop.index0 %}
+            {% include "partials/poster_card.html" %}
+          {% endfor %}
+        {% else %}
+          <div class="empty">暂无数据</div>
+        {% endif %}
+      </div>
+    </section>
+  {% endfor %}
+</div>
+{% endblock %}
+

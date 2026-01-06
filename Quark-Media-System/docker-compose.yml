@@ -1,0 +1,67 @@
+services:
+  quarkdrive-webdav:
+    build:
+      context: ./services/quarkdrive-webdav
+      dockerfile: Dockerfile
+    ports:
+      - "5245:8080"
+      - "12345:12345"
+    volumes:
+      - ./data/webdav_cache:/data/webdav_cache
+    environment:
+      - PORT=8080
+      - WEBDAV_ADMIN_HOST=0.0.0.0
+      - WEBDAV_ADMIN_PORT=12345
+      - QUARK_COOKIE=${QUARK_COOKIE}
+      - WEBDAV_AUTH_USER=${WEBDAV_AUTH_USER}
+      - WEBDAV_AUTH_PASSWORD=${WEBDAV_AUTH_PASSWORD}
+
+  core-backend:
+    build:
+      context: ./services/core-backend
+      dockerfile: Dockerfile
+    image: quark-media-core-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - QUARK_COOKIE=${QUARK_COOKIE}
+      - DATABASE_URL=postgresql+asyncpg://quark:quark@postgres:5432/quark_media
+    depends_on:
+      - quarkdrive-webdav
+      - redis
+      - postgres
+
+  worker:
+    image: quark-media-core-backend
+    command: ["python", "-m", "services.workers.transfer_worker"]
+    working_dir: /app
+    environment:
+      - QUARK_COOKIE=${QUARK_COOKIE}
+      - DATABASE_URL=postgresql+asyncpg://quark:quark@postgres:5432/quark_media
+      - REDIS_URL=redis://redis:6379/0
+      - WEBDAV_CACHE_URL=http://quarkdrive-webdav:12345/cache/invalidate
+      - TRANSFER_QUEUE_KEY=queue:transfer
+      - TRANSFER_QUEUE_MODE=list
+      - QUARK_MEDIA_ROOT=/QuarkMedia
+    volumes:
+      - ./services/workers:/app/services/workers
+    depends_on:
+      - quarkdrive-webdav
+      - redis
+      - postgres
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=quark
+      - POSTGRES_PASSWORD=quark
+      - POSTGRES_DB=quark_media
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
