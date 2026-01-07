@@ -1,0 +1,11 @@
+<svg width="400" height="600" viewBox="0 0 400 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="400" y2="600" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1e293b" />
+      <stop offset="1" stop-color="#0f172a" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="600" rx="32" fill="url(#g)" />
+  <rect x="40" y="60" width="320" height="480" rx="24" fill="#111827" stroke="#334155" stroke-width="2" />
+  <text x="200" y="320" fill="#94a3b8" font-family="Space Grotesk, sans-serif" font-size="28" text-anchor="middle">Poster</text>
+</svg>
